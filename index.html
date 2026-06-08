@@ -270,12 +270,14 @@
                     <thead>
                         <tr>
                             <th>品种</th>
+                            <th>现货价格</th>
                             <th colspan="3">品质升贴水</th>
                             <th colspan="3">品牌升贴水</th>
                             <th colspan="3">总升贴水</th>
                             <th colspan="3">交割成本</th>
                         </tr>
                         <tr>
+                            <th></th>
                             <th></th>
                             <th>X=1</th>
                             <th>X=1.5</th>
@@ -386,7 +388,7 @@
                     return;
                 }
 
-                const oreResult = { name: ore.name, quality: [], brand: [], total: [], cost: [] };
+                const oreResult = { name: ore.name, price: ore.price, quality: [], brand: [], total: [], cost: [] };
 
                 coeffs.forEach(x => {
                     // Fe升贴水（与X相关）
@@ -525,6 +527,7 @@
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${result.name}</td>
+                    <td style="font-weight:bold;">${result.price}</td>
                     <td class="result-cell">${result.quality[0].toFixed(1)}</td>
                     <td class="result-cell">${result.quality[1].toFixed(1)}</td>
                     <td class="result-cell">${result.quality[2].toFixed(1)}</td>
