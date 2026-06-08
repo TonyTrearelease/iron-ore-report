@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交割成本计算器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            font-size: 2em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .panel {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .panel h2 {
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+        .params-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .param-item {
+            display: flex;
+            flex-direction: column;
+        }
+        .param-item label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .param-item input {
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+        .param-item input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85em;
+        }
+        th, td {
+            padding: 8px 6px;
+            text-align: center;
+            border: 1px solid #ddd;
+        }
+        th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        tr:hover {
+            background: #e8f4ff;
+        }
+        tr.min-cost {
+            background: #d4edda !important;
+            font-weight: bold;
+        }
+        input.cell-input {
+            width: 70px;
+            padding: 4px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            text-align: center;
+        }
+        input.cell-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .result-cell {
+            font-weight: bold;
+            color: #333;
+        }
+        .min-row {
+            background: #28a745 !important;
+            color: white;
+        }
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            margin-right: 10px;
+        }
+        .btn:hover {
+            background: #5568d3;
+        }
+        .btn-success {
+            background: #28a745;
+        }
+        .btn-success:hover {
+            background: #218838;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+        .summary-item {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .summary-item .label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        .summary-item .value {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        .table-container {
+            overflow-x: auto;
+        }
+        .coefficient-selector {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .coefficient-selector label {
+            font-weight: bold;
+            color: #333;
+        }
+        .coefficient-selector input {
+            width: 80px;
+            padding: 5px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 交割成本计算器</h1>
+        
+        <!-- 交割质量基准 -->
+        <div class="panel">
+            <h2>交割质量基准</h2>
+            <div style="font-size: 0.95em; color: #555; line-height: 2;">
+                <span>铁（Fe）= 61.0%</span> &nbsp;|&nbsp;
+                <span>SiO₂ = 4.5%</span> &nbsp;|&nbsp;
+                <span>Al₂O₃ = 2.5%</span> &nbsp;|&nbsp;
+                <span>P ≤ 0.10%</span> &nbsp;|&nbsp;
+                <span>S ≤ 0.03%</span>
+            </div>
+        </div>
+
+        <!-- 升贴水系数设置 -->
+        <div class="panel">
+            <h2>升贴水系数设置</h2>
+            <div class="params-grid">
+                <div class="param-item">
+                    <label>X 系数 1</label>
+                    <input type="number" id="coeff1" value="1" step="0.1">
+                </div>
+                <div class="param-item">
+                    <label>X 系数 2</label>
+                    <input type="number" id="coeff2" value="1.5" step="0.1">
+                </div>
+                <div class="param-item">
+                    <label>X 系数 3</label>
+                    <input type="number" id="coeff3" value="2" step="0.1">
+                </div>
+                <div class="param-item">
+                    <label>固定费用</label>
+                    <input type="number" id="fixedCost" value="8" step="1">
+                </div>
+            </div>
+        </div>
+
+        <!-- 品质调整规则说明 -->
+        <div class="panel">
+            <h2>品质调整规则</h2>
+            <div style="font-size: 0.9em; color: #555; line-height: 1.8;">
+                <div><strong>铁（Fe）[60.0%, 63.5%]</strong>：与61%相比，每降低0.1%扣价X，每升高0.1%升价X</div>
+                <div><strong>铁（Fe）[56.0%, 60.0%)</strong>：与60%相比，每降低0.1%扣价(X+1.5)，累计计算</div>
+                <div><strong>铁（Fe）>63.5%</strong>：与63.5%相比，每升高0.1%升价(X+1.0)，累计计算</div>
+                <div style="margin-top:8px"><strong>SiO₂ ≤8.5%</strong></div>
+                <div>&nbsp;&nbsp; <4.5%：与4.5%相比，每降低0.1%，升价0.5</div>
+                <div>&nbsp;&nbsp; (4.5%, 6.5%]：与4.5%相比，每升高0.1%，扣价1.0</div>
+                <div>&nbsp;&nbsp; (6.5%, 8.5%]：与6.5%相比，每升高0.1%，扣价1.5，累计计算</div>
+                <div style="margin-top:8px"><strong>Al₂O₃ ≤3.5%</strong></div>
+                <div>&nbsp;&nbsp; <1.0%：以1.0%计价</div>
+                <div>&nbsp;&nbsp; [1.0%, 2.5%)：与2.5%相比，每降低0.1%，升价2.0</div>
+                <div>&nbsp;&nbsp; (2.5%, 3.5%]：与2.5%相比，每升高0.1%，扣价3.0</div>
+                <div style="margin-top:8px"><strong>P ≤0.15%</strong></div>
+                <div>&nbsp;&nbsp; (0.10%, 0.12%]：与0.10%相比，每升高0.01%，扣价10.0</div>
+                <div>&nbsp;&nbsp; (0.12%, 0.15%]：与0.12%相比，每升高0.01%，扣价15.0，累计计算</div>
+                <div style="margin-top:8px"><strong>S ≤0.20%</strong></div>
+                <div>&nbsp;&nbsp; (0.03%, 0.10%]：与0.03%相比，每升高0.01%，扣价1.0</div>
+                <div>&nbsp;&nbsp; (0.10%, 0.20%]：与0.10%相比，每升高0.01%，扣价5.0，累计计算</div>
+                <div style="margin-top:8px; color:#e74c3c;"><strong>注意：SiO₂与Al₂O₃合计不得超过10%</strong></div>
+            </div>
+        </div>
+
+        <!-- 矿种数据编辑 -->
+        <div class="panel">
+            <h2>矿种指标与价格</h2>
+            <div class="table-container">
+                <table id="oreTable">
+                    <thead>
+                        <tr>
+                            <th>品种</th>
+                            <th>Fe(%)</th>
+                            <th>Si(%)</th>
+                            <th>Al(%)</th>
+                            <th>P(%)</th>
+                            <th>S(%)</th>
+                            <th>水分(%)</th>
+                            <th>现货价格</th>
+                            <th>品牌升贴水</th>
+                        </tr>
+                    </thead>
+                    <tbody id="oreTableBody">
+                    </tbody>
+                </table>
+            </div>
+            <div style="margin-top: 15px;">
+                <button class="btn" onclick="addOre()">+ 添加品种</button>
+                <button class="btn btn-success" onclick="calculate()">计算交割成本</button>
+            </div>
+        </div>
+
+        <!-- 计算结果 -->
+        <div class="panel">
+            <h2>交割成本计算结果</h2>
+            <div class="table-container">
+                <table id="resultTable">
+                    <thead>
+                        <tr>
+                            <th>品种</th>
+                            <th colspan="3">品质升贴水</th>
+                            <th colspan="3">品牌升贴水</th>
+                            <th colspan="3">总升贴水</th>
+                            <th colspan="3">交割成本</th>
+                        </tr>
+                        <tr>
+                            <th></th>
+                            <th>X=1</th>
+                            <th>X=1.5</th>
+                            <th>X=2</th>
+                            <th>X=1</th>
+                            <th>X=1.5</th>
+                            <th>X=2</th>
+                            <th>X=1</th>
+                            <th>X=1.5</th>
+                            <th>X=2</th>
+                            <th>X=1</th>
+                            <th>X=1.5</th>
+                            <th>X=2</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 最低交割成本汇总 -->
+        <div class="panel">
+            <h2>最低交割成本汇总</h2>
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <div class="label">X=1 最低成本品种</div>
+                    <div class="value" id="minOre1">-</div>
+                    <div class="value" id="minCost1">-</div>
+                </div>
+                <div class="summary-item">
+                    <div class="label">X=1.5 最低成本品种</div>
+                    <div class="value" id="minOre2">-</div>
+                    <div class="value" id="minCost2">-</div>
+                </div>
+                <div class="summary-item">
+                    <div class="label">X=2 最低成本品种</div>
+                    <div class="value" id="minOre3">-</div>
+                    <div class="value" id="minCost3">-</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 默认矿种数据
+        const defaultOres = [
+            { name: '纽曼粉', fe: 61.2, si: 5, al: 2.6, p: 0.098, s: 0.02, water: 8.3, price: 741, warehouse: 0 },
+            { name: '麦克粉', fe: 60.5, si: 4.85, al: 2.4, p: 0.08, s: 0.03, water: 8.5, price: 741, warehouse: 0 },
+            { name: '金布巴粉(60.5)', fe: 60.3, si: 4.9, al: 3.45, p: 0.12, s: 0.02, water: 7.6, price: 697, warehouse: 0 },
+            { name: '罗伊山粉', fe: 60.7, si: 4.5, al: 2.3, p: 0.05, s: 0.03, water: 9, price: 727, warehouse: 0 },
+            { name: 'BRBF', fe: 62.5, si: 4.8, al: 1.9, p: 0.09, s: 0.02, water: 7.8, price: 826, warehouse: 15 },
+            { name: '超特粉', fe: 56.5, si: 6.4, al: 3.2, p: 0.06, s: 0.035, water: 9, price: 587, warehouse: 0 },
+            { name: '混合粉', fe: 58.2, si: 5.8, al: 2.6, p: 0.08, s: 0.035, water: 8, price: 664, warehouse: 0 },
+            { name: '卡粉', fe: 65, si: 2, al: 1.22, p: 0.063, s: 0, water: 7.4, price: 879, warehouse: 15 },
+            { name: '杨迪粉', fe: 56.8, si: 5.75, al: 1.8, p: 0.05, s: 0.01, water: 10.5, price: null, warehouse: 0 },
+            { name: '卡拉拉精粉', fe: 65.5, si: 7.4, al: 0.2, p: 0.03, s: 0.04, water: 9.3, price: 832, warehouse: 0 },
+            { name: '金布巴粉(59.5)', fe: 59.5, si: 5.1, al: 3.3, p: 0.018, s: 0.019, water: 7.75, price: 692, warehouse: 0 },
+            { name: 'IOC6', fe: 61.31, si: 7.91, al: 1.42, p: 0.061, s: 0, water: 8.6, price: 726, warehouse: 0 },
+            { name: 'SP10粉', fe: 57.5, si: 6.6, al: 3.8, p: 0.12, s: 0.03, water: 7.5, price: 627, warehouse: 0 },
+            { name: 'PB粉', fe: 60.8, si: 4.3, al: 2.5, p: 0.11, s: 0.02, water: 8.8, price: 736, warehouse: 0 },
+            { name: 'PB粉(61.11)', fe: 61.11, si: 4, al: 2.43, p: 0.113, s: 0.017, water: 7.62, price: 740, warehouse: 0 }
+        ];
+
+        let ores = JSON.parse(JSON.stringify(defaultOres));
+
+        function renderOreTable() {
+            const tbody = document.getElementById('oreTableBody');
+            tbody.innerHTML = '';
+            ores.forEach((ore, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><input type="text" class="cell-input" value="${ore.name}" onchange="updateOre(${index}, 'name', this.value)" style="width:120px"></td>
+                    <td><input type="number" class="cell-input" value="${ore.fe}" step="0.1" onchange="updateOre(${index}, 'fe', parseFloat(this.value))"></td>
+                    <td><input type="number" class="cell-input" value="${ore.si}" step="0.01" onchange="updateOre(${index}, 'si', parseFloat(this.value))"></td>
+                    <td><input type="number" class="cell-input" value="${ore.al}" step="0.01" onchange="updateOre(${index}, 'al', parseFloat(this.value))"></td>
+                    <td><input type="number" class="cell-input" value="${ore.p}" step="0.001" onchange="updateOre(${index}, 'p', parseFloat(this.value))"></td>
+                    <td><input type="number" class="cell-input" value="${ore.s}" step="0.001" onchange="updateOre(${index}, 's', parseFloat(this.value))"></td>
+                    <td><input type="number" class="cell-input" value="${ore.water}" step="0.1" onchange="updateOre(${index}, 'water', parseFloat(this.value))"></td>
+                    <td><input type="number" class="cell-input" value="${ore.price ?? ''}" step="1" placeholder="可选" onchange="updateOre(${index}, 'price', this.value ? parseFloat(this.value) : null)"></td>
+                    <td style="font-weight:bold; color:#667eea;">${ore.warehouse}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateOre(index, field, value) {
+            ores[index][field] = value;
+        }
+
+        function addOre() {
+            ores.push({ name: '新品种', fe: 62, si: 5, al: 2, p: 0.1, s: 0.05, water: 10, price: null, warehouse: 0 });
+            renderOreTable();
+        }
+
+        function calculate() {
+            const coeff1 = parseFloat(document.getElementById('coeff1').value);
+            const coeff2 = parseFloat(document.getElementById('coeff2').value);
+            const coeff3 = parseFloat(document.getElementById('coeff3').value);
+            const fixedCost = parseFloat(document.getElementById('fixedCost').value);
+
+            const coeffs = [coeff1, coeff2, coeff3];
+            const results = [];
+
+            ores.forEach(ore => {
+                if (ore.price === null || isNaN(ore.price)) {
+                    results.push(null);
+                    return;
+                }
+
+                const oreResult = { name: ore.name, quality: [], brand: [], total: [], cost: [] };
+
+                coeffs.forEach(x => {
+                    // Fe升贴水（与X相关）
+                    let fePremium;
+                    if (ore.fe >= 60.0 && ore.fe <= 63.5) {
+                        // [60.0%, 63.5%]: 与61%相比，每0.1%偏差X
+                        fePremium = (ore.fe - 61.0) * x * 10;
+                    } else if (ore.fe >= 56.0 && ore.fe < 60.0) {
+                        // [56.0%, 60.0%): 与60%相比每0.1%扣价(X+1.5) + 60%处的累计扣价
+                        // 60%处相对于61%的扣价 = (60-61)*X*10 = -10X
+                        fePremium = -10 * x + (ore.fe - 60.0) * (x + 1.5) * 10;
+                    } else if (ore.fe > 63.5) {
+                        // >63.5%: 与63.5%相比每0.1%升价(X+1.0) + 63.5%处的累计升价
+                        // 63.5%处相对于61%的升价 = (63.5-61)*X*10 = 25X
+                        fePremium = 25 * x + (ore.fe - 63.5) * (x + 1.0) * 10;
+                    } else {
+                        // <56.0%，按56%的扣价继续计算
+                        // 56%处扣价 = -10X + (56-60)*(X+1.5)*10 = -10X - 40(X+1.5) = -50X - 60
+                        fePremium = -50 * x - 60 + (ore.fe - 56.0) * (x + 1.5) * 10;
+                    }
+
+                    // SiO₂升贴水（分段计价）
+                    let siPremium;
+                    if (ore.si < 1.0) {
+                        // <1.0%: 按1.0%计价
+                        siPremium = (1.0 - 4.5) * 5;  // 1.0%处升价 = (4.5-1.0)*5 = 17.5
+                    } else if (ore.si < 4.5) {
+                        // [1.0%, 4.5%): 与4.5%相比，每降低0.1%，升价0.5
+                        siPremium = (4.5 - ore.si) * 5;
+                    } else if (ore.si <= 6.5) {
+                        // (4.5%, 6.5%]: 与4.5%相比，每升高0.1%，扣价1.0
+                        siPremium = (4.5 - ore.si) * 10;
+                    } else if (ore.si <= 8.5) {
+                        // (6.5%, 8.5%]: 与6.5%相比每升高0.1%扣1.5，累计6.5%处扣价
+                        // 6.5%处扣价 = (4.5-6.5)*10 = -20
+                        siPremium = -20 + (6.5 - ore.si) * 15;
+                    } else {
+                        // >8.5%: 超标，按8.5%继续计算
+                        // 8.5%处扣价 = -20 + (6.5-8.5)*15 = -50
+                        siPremium = -50 + (8.5 - ore.si) * 15;
+                    }
+
+                    // Al₂O₃升贴水（分段计价）
+                    let alPremium;
+                    if (ore.al < 1.0) {
+                        // <1.0%: 以1.0%计价
+                        alPremium = (2.5 - 1.0) * 20;  // 1.0%处升价 = (2.5-1.0)*20 = 30
+                    } else if (ore.al < 2.5) {
+                        // [1.0%, 2.5%): 与2.5%相比，每降低0.1%，升价2.0
+                        alPremium = (2.5 - ore.al) * 20;
+                    } else if (ore.al <= 3.5) {
+                        // (2.5%, 3.5%]: 与2.5%相比，每升高0.1%，扣价3.0
+                        alPremium = (2.5 - ore.al) * 30;
+                    } else {
+                        // >3.5%: 超标，按3.5%继续计算
+                        // 3.5%处扣价 = (2.5-3.5)*30 = -30
+                        alPremium = -30 + (3.5 - ore.al) * 30;
+                    }
+
+                    // 品质升贴水 = Fe升贴水(含X) + Si升贴水 + Al升贴水
+                    const qualityPremium = fePremium + siPremium + alPremium;
+
+                    // 品牌升贴水 = P升贴水 + S升贴水
+                    // P升贴水（分段计价）
+                    let pPremium;
+                    if (ore.p <= 0.10) {
+                        pPremium = 0;
+                    } else if (ore.p <= 0.12) {
+                        // (0.10%, 0.12%]: 与0.10%相比，每升高0.01%，扣价10.0
+                        pPremium = (0.10 - ore.p) * 1000;
+                    } else if (ore.p <= 0.15) {
+                        // (0.12%, 0.15%]: 与0.12%相比每升高0.01%扣15.0，累计0.12%处扣价
+                        // 0.12%处扣价 = (0.10-0.12)*1000 = -20
+                        pPremium = -20 + (0.12 - ore.p) * 1500;
+                    } else {
+                        // >0.15%: 超标
+                        // 0.15%处扣价 = -20 + (0.12-0.15)*1500 = -65
+                        pPremium = -65 + (0.15 - ore.p) * 1500;
+                    }
+
+                    // S升贴水（分段计价）
+                    let sPremium;
+                    if (ore.s <= 0.03) {
+                        sPremium = 0;
+                    } else if (ore.s <= 0.10) {
+                        // (0.03%, 0.10%]: 与0.03%相比，每升高0.01%，扣价1.0
+                        sPremium = (0.03 - ore.s) * 100;
+                    } else if (ore.s <= 0.20) {
+                        // (0.10%, 0.20%]: 与0.10%相比每升高0.01%扣5.0，累计0.10%处扣价
+                        // 0.10%处扣价 = (0.03-0.10)*100 = -7
+                        sPremium = -7 + (0.10 - ore.s) * 500;
+                    } else {
+                        // >0.20%: 超标
+                        // 0.20%处扣价 = -7 + (0.10-0.20)*500 = -57
+                        sPremium = -57 + (0.20 - ore.s) * 500;
+                    }
+
+                    const brandPremium = pPremium + sPremium;
+
+                    // 总升贴水
+                    const totalPremium = qualityPremium + brandPremium;
+
+                    // 交割成本 = 现货价格/(1-水分%) - 总升贴水 - 折厂库仓单 - 固定费用
+                    const cost = ore.price / (1 - ore.water / 100) - totalPremium - ore.warehouse - fixedCost;
+
+                    oreResult.quality.push(qualityPremium);
+                    oreResult.brand.push(brandPremium);
+                    oreResult.total.push(totalPremium);
+                    oreResult.cost.push(cost);
+                });
+
+                results.push(oreResult);
+            });
+
+            renderResults(results, coeffs);
+        }
+
+        function renderResults(results, coeffs) {
+            const tbody = document.getElementById('resultTableBody');
+            tbody.innerHTML = '';
+
+            let minCosts = [Infinity, Infinity, Infinity];
+            let minOres = ['', '', ''];
+
+            results.forEach((result, index) => {
+                if (!result) return;
+
+                // 更新最低成本
+                for (let i = 0; i < 3; i++) {
+                    if (result.cost[i] < minCosts[i]) {
+                        minCosts[i] = result.cost[i];
+                        minOres[i] = result.name;
+                    }
+                }
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${result.name}</td>
+                    <td class="result-cell">${result.quality[0].toFixed(1)}</td>
+                    <td class="result-cell">${result.quality[1].toFixed(1)}</td>
+                    <td class="result-cell">${result.quality[2].toFixed(1)}</td>
+                    <td class="result-cell">${result.brand[0].toFixed(1)}</td>
+                    <td class="result-cell">${result.brand[1].toFixed(1)}</td>
+                    <td class="result-cell">${result.brand[2].toFixed(1)}</td>
+                    <td class="result-cell">${result.total[0].toFixed(1)}</td>
+                    <td class="result-cell">${result.total[1].toFixed(1)}</td>
+                    <td class="result-cell">${result.total[2].toFixed(1)}</td>
+                    <td class="result-cell">${result.cost[0].toFixed(2)}</td>
+                    <td class="result-cell">${result.cost[1].toFixed(2)}</td>
+                    <td class="result-cell">${result.cost[2].toFixed(2)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // 高亮最低成本行
+            const rows = tbody.querySelectorAll('tr');
+            let rowIdx = 0;
+            results.forEach((result, index) => {
+                if (!result) return;
+                let isMin = false;
+                for (let i = 0; i < 3; i++) {
+                    if (result.cost[i] === minCosts[i]) {
+                        isMin = true;
+                        break;
+                    }
+                }
+                if (isMin) {
+                    rows[rowIdx].classList.add('min-cost');
+                }
+                rowIdx++;
+            });
+
+            // 更新汇总
+            document.getElementById('minOre1').textContent = minOres[0] || '-';
+            document.getElementById('minCost1').textContent = minCosts[0] !== Infinity ? minCosts[0].toFixed(2) : '-';
+            document.getElementById('minOre2').textContent = minOres[1] || '-';
+            document.getElementById('minCost2').textContent = minCosts[1] !== Infinity ? minCosts[1].toFixed(2) : '-';
+            document.getElementById('minOre3').textContent = minOres[2] || '-';
+            document.getElementById('minCost3').textContent = minCosts[2] !== Infinity ? minCosts[2].toFixed(2) : '-';
+        }
+
+        // 初始化
+        renderOreTable();
+        calculate();
+    </script>
+</body>
+</html>
