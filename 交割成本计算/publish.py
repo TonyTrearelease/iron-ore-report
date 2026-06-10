@@ -1,10 +1,15 @@
 import pandas as pd
 import re
 import os
+import sys
+import io
 import base64
 import urllib.request
 import urllib.error
 import json
+
+# 解决Windows GBK编码问题
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 # 配置
 CSV_PATH = os.path.join(os.path.dirname(__file__), '..', 'Spot_RZ_MS.csv')
@@ -16,7 +21,7 @@ BRANCH = 'main'
 API_URL = f'https://api.github.com/repos/{OWNER}/{REPO}/contents/index.html'
 
 print("=" * 50)
-print("索引价格 - 每日更新发布工具")
+print("交割成本计算器 - 更新发布工具")
 print("=" * 50)
 
 # 1. 读取最新价格
@@ -85,7 +90,7 @@ if not GITHUB_TOKEN:
 
 # 获取现有文件的SHA
 try:
-    req = urllib.request.Request(API_URL, headers={'Authorization': f'token {GITHUB_TOKEN}'})
+    req = urllib.request.Request(API_URL, headers={'Authorization': f'Bearer {GITHUB_TOKEN}'})
     with urllib.request.urlopen(req) as resp:
         existing = json.loads(resp.read())
         sha = existing.get('sha', '')
@@ -93,7 +98,7 @@ except urllib.error.HTTPError as e:
     if e.code == 404:
         sha = ''
     else:
-        print(f"  ❌ 获取文件信息失败: {e.code}")
+        print(f"  X 获取文件信息失败: {e.code}")
         sha = ''
 
 # 推送文件
@@ -111,7 +116,7 @@ req = urllib.request.Request(
     API_URL,
     data=payload,
     headers={
-        'Authorization': f'token {GITHUB_TOKEN}',
+        'Authorization': f'Bearer {GITHUB_TOKEN}',
         'Content-Type': 'application/json'
     },
     method='PUT'
@@ -120,10 +125,10 @@ req = urllib.request.Request(
 try:
     with urllib.request.urlopen(req) as resp:
         result = json.loads(resp.read())
-        print(f"\n✅ 发布成功！")
+        print(f"\n 发布成功！")
         print(f"   访问: https://{OWNER}.github.io/{REPO}")
 except urllib.error.HTTPError as e:
-    print(f"\n❌ 推送失败: {e.code} {e.reason}")
+    print(f"\n X 推送失败: {e.code} {e.reason}")
     print(f"   详情: {e.read().decode()}")
 
 print("\n按任意键退出...")
