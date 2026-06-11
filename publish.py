@@ -26,7 +26,7 @@ def get_remote_url_with_token():
     return None
 
 def push_with_token():
-    """尝试推送，如果失败且有token则带token重试"""
+    """先拉取远程变更，再推送"""
     # 先获取当前的remote URL
     result = subprocess.run([GIT_EXE, "remote", "get-url", "origin"], capture_output=True, text=True)
     original_url = result.stdout.strip()
@@ -35,7 +35,13 @@ def push_with_token():
     if token_url:
         subprocess.run([GIT_EXE, "remote", "set-url", "origin", token_url], capture_output=True)
 
-    retry = token_url is not None
+    # 先拉取远程变更
+    print("  → 拉取远程变更...")
+    subprocess.run([GIT_EXE, "pull", "--rebase", "origin", "main"],
+                   capture_output=True, text=True)
+
+    # 再推送
+    print("  → 推送到 GitHub ...")
     result = subprocess.run([GIT_EXE, "push", "origin", "main"], capture_output=True, text=True)
 
     # 恢复原来的URL
