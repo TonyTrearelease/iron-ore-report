@@ -20,6 +20,11 @@ def ensure_git_config():
 
 def push_to_github():
     """Pull remote changes first, then push with token if available"""
+    # Rename master to main if needed (new git init defaults to master)
+    r = subprocess.run([GIT_EXE, "branch", "--show-current"], capture_output=True, text=True, cwd=SCRIPT_DIR)
+    if r.stdout.strip() == "master":
+        subprocess.run([GIT_EXE, "branch", "-m", "master", "main"], check=True, cwd=SCRIPT_DIR)
+
     token = os.environ.get("GITHUB_TOKEN", "")
     if token:
         token_url = f"https://{OWNER}:{token}@github.com/{OWNER}/{REPO}.git"
