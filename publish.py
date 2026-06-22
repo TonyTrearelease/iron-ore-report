@@ -1,4 +1,4 @@
-"""One-click update data and push to GitHub Pages"""
+"""一键更新数据并推送至GitHub Pages"""
 import subprocess
 import sys
 import os
@@ -8,6 +8,16 @@ GIT_EXE = r"C:\Program Files\Git\bin\git.exe"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 OWNER = "TonyTrearelease"
 REPO = "iron-ore-report"
+
+def run_step(name, command):
+    print(f"\n{'='*60}")
+    print(f"  {name}")
+    print(f"{'='*60}\n")
+    result = subprocess.run(command, shell=True, cwd=SCRIPT_DIR)
+    if result.returncode != 0:
+        print(f"\n  [FAILED] {name} failed, aborting")
+        sys.exit(1)
+    print(f"  [OK] {name} completed")
 
 def ensure_git_config():
     """Set git user config if not set"""
@@ -19,38 +29,28 @@ def ensure_git_config():
         subprocess.run([GIT_EXE, "config", "user.email", "tonytrearelease@users.noreply.github.com"], cwd=SCRIPT_DIR)
 
 def push_to_github():
-    """Pull remote changes first, then push with token if available"""
-    # Rename master to main if needed (new git init defaults to master)
+    """Push to GitHub with force lease (safe for solo use)"""
+    # Rename master to main if needed
     r = subprocess.run([GIT_EXE, "branch", "--show-current"], capture_output=True, text=True, cwd=SCRIPT_DIR)
     if r.stdout.strip() == "master":
         subprocess.run([GIT_EXE, "branch", "-m", "master", "main"], check=True, cwd=SCRIPT_DIR)
 
+    # Set token URL if available
     token = os.environ.get("GITHUB_TOKEN", "")
     if token:
         token_url = f"https://{OWNER}:{token}@github.com/{OWNER}/{REPO}.git"
         subprocess.run([GIT_EXE, "remote", "set-url", "origin", token_url], capture_output=True, cwd=SCRIPT_DIR)
 
-    print("  -> Pulling remote changes...")
-    subprocess.run([GIT_EXE, "pull", "--rebase", "origin", "main"],
-                   capture_output=True, text=True, cwd=SCRIPT_DIR)
-    print("  -> Pushing to GitHub ...")
-    result = subprocess.run([GIT_EXE, "push", "origin", "main"],
+    # Force push with lease (safe: only pushes if remote hasn't changed unexpectedly)
+    print("  -> Pushing to GitHub (force with lease)...")
+    result = subprocess.run([GIT_EXE, "push", "--force-with-lease", "origin", "main"],
                             capture_output=True, text=True, cwd=SCRIPT_DIR)
 
+    # Restore plain URL
     if token:
         plain_url = f"https://github.com/{OWNER}/{REPO}.git"
         subprocess.run([GIT_EXE, "remote", "set-url", "origin", plain_url], capture_output=True, cwd=SCRIPT_DIR)
     return result
-
-def run_step(name, command):
-    print(f"\n{'='*60}")
-    print(f"  {name}")
-    print(f"{'='*60}\n")
-    result = subprocess.run(command, shell=True, cwd=SCRIPT_DIR)
-    if result.returncode != 0:
-        print(f"\n  [FAILED] {name} failed, aborting")
-        sys.exit(1)
-    print(f"  [OK] {name} completed")
 
 def main():
     steps = [
@@ -76,7 +76,6 @@ def main():
     subprocess.run([GIT_EXE, "add", "-A"], check=True, cwd=SCRIPT_DIR)
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     subprocess.run([GIT_EXE, "commit", "-m", f"chore: update data ({now})"], check=True, cwd=SCRIPT_DIR)
-    print("  -> Pushing to GitHub ...")
 
     result = push_to_github()
     if result.returncode == 0:
@@ -88,7 +87,7 @@ def main():
         print("  [FAILED] Push failed, details:")
         print(result.stdout)
         print(result.stderr)
-        print("\n  Tip: Check your network or run 'git push origin main' manually")
+        print("\n  Tip: Check your network or run 'git push --force-with-lease origin main' manually")
 
     print(f"\n{'='*60}")
     print("  [DONE] All completed!")
