@@ -41,9 +41,9 @@ def push_to_github():
         token_url = f"https://{OWNER}:{token}@github.com/{OWNER}/{REPO}.git"
         subprocess.run([GIT_EXE, "remote", "set-url", "origin", token_url], capture_output=True, cwd=SCRIPT_DIR)
 
-    # Force push with lease (safe: only pushes if remote hasn't changed unexpectedly)
-    print("  -> Pushing to GitHub (force with lease)...")
-    result = subprocess.run([GIT_EXE, "push", "--force-with-lease", "origin", "main"],
+    # Force push (safe for solo project)
+    print("  -> Pushing to GitHub ...")
+    result = subprocess.run([GIT_EXE, "push", "--force", "origin", "main"],
                             capture_output=True, text=True, cwd=SCRIPT_DIR)
 
     # Restore plain URL
@@ -87,7 +87,7 @@ def main():
         print("  [FAILED] Push failed, details:")
         print(result.stdout)
         print(result.stderr)
-        print("\n  Tip: Check your network or run 'git push --force-with-lease origin main' manually")
+        print("\n  Tip: Check your network or run 'git push --force origin main' manually")
 
     print(f"\n{'='*60}")
     print("  [DONE] All completed!")
