@@ -9,8 +9,6 @@ build/
 # 临时文件
 *.tmp
 *.temp
-publish_log*.txt
-iron_repo_temp/
 ~$*
 Thumbs.db
 .DS_Store
