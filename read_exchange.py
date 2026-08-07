@@ -39,6 +39,12 @@ def fill_with_rolling_diff(df, source_col_idx, target_col_idx, window=10):
 
 def process_index_wind(df):
     print("\n处理 Index_Wind sheet 的特殊逻辑...")
+    # 清理空白字符串（Excel中空单元格可能被读为 ' '），统一转为 NaN，避免数值运算报错
+    for col in df.columns:
+        if df[col].dtype == object:
+            df[col] = df[col].apply(
+                lambda x: np.nan if isinstance(x, str) and not x.strip() else x
+            )
     if len(df.columns) < 16:
         print("警告：Index_Wind sheet列数不足16列，跳过特殊处理")
         return df

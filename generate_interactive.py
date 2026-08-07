@@ -43,7 +43,9 @@ def get_date_range(index_wind_df):
         lambda row: any(pd.to_numeric(row, errors='coerce') > 0), axis=1
     )]
     last_index_date = pd.to_datetime(index_wind_valid['指标名称'].max())
-    current_month_start = pd.Timestamp(year=last_index_date.year, month=last_index_date.month, day=1)
+    # 当月按真实日历日计算，与 import_cost_calculator.py 保持一致
+    today = datetime.today()
+    current_month_start = pd.Timestamp(year=today.year, month=today.month, day=1)
     date_points = {
         'M-3': current_month_start - pd.DateOffset(months=3),
         'M-2': current_month_start - pd.DateOffset(months=2),
