@@ -99,14 +99,14 @@ def get_frt_rate(frt_df, target_date, last_index_date):
         if not filtered.empty:
             latest = filtered.sort_values('指标名称').iloc[-1]
             for col in df.columns:
-                if 'BCI_C5' in col or 'BCI-C5' in col:
+                if 'BCI_C5' in col or 'BCI-C5' in col or '西澳' in col:
                     v = latest[col]
                     if pd.notna(v) and v != '':
                         return float(v)
     monthly_data = df[pd.to_datetime(df['指标名称']).dt.to_period('M') == target_month]
     if not monthly_data.empty:
         for col in df.columns:
-            if 'BCI_C5' in col or 'BCI-C5' in col:
+            if 'BCI_C5' in col or 'BCI-C5' in col or '西澳' in col:
                 vals = monthly_data[col].dropna()
                 if not vals.empty:
                     return vals.astype(float).mean()
@@ -114,7 +114,7 @@ def get_frt_rate(frt_df, target_date, last_index_date):
     if not filtered.empty:
         latest = filtered.sort_values('指标名称').iloc[-1]
         for col in df.columns:
-            if 'BCI_C5' in col or 'BCI-C5' in col:
+            if 'BCI_C5' in col or 'BCI-C5' in col or '西澳' in col:
                 v = latest[col]
                 if pd.notna(v) and v != '':
                     return float(v)
@@ -163,7 +163,8 @@ def get_recent_spread(index_wind_df, product, days=10):
     for col in df.columns:
         if '65%' in col and '巴西' in col:
             mb65_col = col
-        if '61%' in col and ('MB' in col or 'mb' in col) and '北方' not in col and '铁矿石价格指数' not in col:
+        # MB61(61%Fe)在THS数据源已移除，以 MB价格指数:62%粉矿 替代
+        if 'MB价格指数' in col and '62%粉矿' in col and '低铝' not in col:
             mb61_col = col
     if mb65_col is None:
         for col in df.columns:
@@ -172,7 +173,7 @@ def get_recent_spread(index_wind_df, product, days=10):
                 break
     if mb61_col is None:
         for col in df.columns:
-            if '61%' in col and 'MB' in col:
+            if 'MB价格指数' in col and '62%粉矿' in col and '低铝' not in col:
                 mb61_col = col
                 break
     if mb65_col is None or mb61_col is None:
@@ -194,16 +195,9 @@ def get_platts_lp(index_wind_df, target_date, last_index_date):
     df = index_wind_df.copy()
     df['指标名称'] = pd.to_datetime(df['指标名称'])
     use_daily = pd.Timestamp(target_date).date() >= pd.Timestamp(last_index_date).date()
-    lump_col = None
-    for col in df.columns:
-        if '低铝' in col and '块矿' in col:
-            lump_col = col
-            break
-    if lump_col is None:
-        for col in df.columns:
-            if '低铝' in col:
-                lump_col = col
-                break
+    # PLATTS LP（块矿溢价），与 import_cost_calculator.get_platts_lp 保持一致；
+    # 注意：不能匹配THS的"MB价格指数:62%粉矿低铝"列（数值为~100，非LP溢价）
+    lump_col = 'PLATTS LP' if 'PLATTS LP' in df.columns else None
     if lump_col is not None:
         if use_daily:
             filtered = df[(df['指标名称'] <= target_date) &

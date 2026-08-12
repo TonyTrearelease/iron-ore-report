@@ -45,24 +45,44 @@ def process_index_wind(df):
             df[col] = df[col].apply(
                 lambda x: np.nan if isinstance(x, str) and not x.strip() else x
             )
-    if len(df.columns) < 16:
-        print("警告：Index_Wind sheet列数不足16列，跳过特殊处理")
+
+    # 数据源变更说明（2026-08-12）：Index_Wind 由Wind数据切换为同花顺(THS)数据，
+    # 列数由16列变为15列，原"MB铁矿石指数(61%Fe)"(MB61)列被移除。
+    # 本逻辑改为按列名定位，不再依赖固定列序号。
+    source_col = None
+    for col in df.columns:
+        # 最完整的日频序列：THS的"价格指数:铁矿石:62%Fe:CFR"（对应原"中国北方61%Fe:CFR"）
+        if '62%Fe' in col and 'CFR' in col:
+            source_col = col
+            break
+    if source_col is None:
+        print("警告：未找到源列(价格指数:铁矿石:62%Fe:CFR)，跳过Index_Wind特殊处理")
         return df
 
-    # 逻辑1：填充第15列（索引14），基于第6列（索引5）
-    df = fill_with_rolling_diff(df, source_col_idx=5, target_col_idx=14)
+    argus_col = None
+    platts_col = None
+    for col in df.columns:
+        if col == 'ARGUS 61':
+            argus_col = col
+        elif col == 'PLATTS LP':
+            platts_col = col
+    if argus_col is None or platts_col is None:
+        print("警告：未找到ARGUS 61/PLATTS LP列，跳过Index_Wind特殊处理")
+        return df
 
-    # 逻辑2：填充第16列（索引15），使用前向填充最近一个非0数据
-    col16 = df.columns[15]
-    col6 = df.columns[5]
-    # 满足条件：第6列有非0值 且 第16列为空
-    condition = df[col6].notna() & (df[col6] != 0) & df[col16].isna()
-    
+    # 逻辑1：基于源列滚动差值填充 ARGUS 61（原逻辑为基于MB61填充第15列）
+    df = fill_with_rolling_diff(
+        df,
+        source_col_idx=list(df.columns).index(source_col),
+        target_col_idx=list(df.columns).index(argus_col),
+    )
+
+    # 逻辑2：源列有非0值时，PLATTS LP 空值用前向填充(ffill)最近一个非0数据
+    condition = df[source_col].notna() & (df[source_col] != 0) & df[platts_col].isna()
     # 将不满足条件的行（即原本有值的行）保留，满足条件的行先设为NaN，然后进行前向填充(ffill)
-    # 注意：这里需要先mask掉需要填充的位置，ffill后再填回去
-    col16_temp = df[col16].mask(condition) 
-    df[col16] = df[col16].fillna(col16_temp.ffill())
-    
+    col_temp = df[platts_col].mask(condition)
+    df[platts_col] = df[platts_col].fillna(col_temp.ffill())
+
     print("Index_Wind sheet 特殊处理完成")
     return df
 

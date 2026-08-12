@@ -33,6 +33,46 @@ INDEX_MAPPING = {
 }
 
 # ============================================================
+# 数据源变更说明（2026-08-12）
+# Index_Frt_exchange.xlsx 的 Index_Wind 由Wind数据切换为同花顺(THS)数据，
+# 列数由16列变为15列，原"MB铁矿石指数(61%Fe)"(MB61)列被移除。
+# 替代映射（基于重叠日期数值比对，相关性均≈1.0）：
+#   MB61             -> 'MB价格指数:62%粉矿'      （与旧MB61差值稳定约+2.15美元/吨，即1%铁品位价差）
+#   MB65             -> 'MB价格指数:巴西65%粉矿'
+#   MB_ALUMINA(底铝) -> 'MB价格指数:62%粉矿低铝'   （旧"底铝"在THS中为"低铝"）
+#   CN_NORTH_61      -> '价格指数:铁矿石:62%Fe:CFR'（与原"中国北方61%Fe:CFR"数值95%一致）
+#   CN_NORTH_65      -> '价格指数:铁矿石:65%Fe:CFR'
+#   CN_NORTH_58      -> '价格指数:铁矿石:58%Fe:CFR'
+# ============================================================
+def find_index_col(df, index_key):
+    """在Index_Wind中按逻辑指数类型定位实际列名（适配THS新列名）。"""
+    if index_key == 'MB61':
+        for col in df.columns:
+            if 'MB价格指数' in col and '62%粉矿' in col and '低铝' not in col:
+                return col
+    elif index_key == 'MB65':
+        for col in df.columns:
+            if '65%' in col and '巴西' in col:
+                return col
+    elif index_key == 'MB_ALUMINA':
+        for col in df.columns:
+            if '低铝' in col or '底铝' in col:
+                return col
+    elif index_key == 'CN61':
+        for col in df.columns:
+            if '62%Fe' in col and 'CFR' in col:
+                return col
+    elif index_key == 'CN65':
+        for col in df.columns:
+            if '65%Fe' in col and 'CFR' in col:
+                return col
+    elif index_key == 'CN58':
+        for col in df.columns:
+            if '58%Fe' in col and 'CFR' in col:
+                return col
+    return None
+
+# ============================================================
 # Spot_RZ_MS.csv（日照港）/ Spot_TJ_MS.csv（天津港）
 # 品种到现货表列名的映射（用于获取销售价格）
 # ============================================================
@@ -183,7 +223,8 @@ def get_frt_rate(frt_df, target_date, last_index_date):
     frt_df = frt_df.copy()
     bci_c5_col = None
     for col in frt_df.columns:
-        if 'BCI-C5' in col or '西澳-青岛' in col:
+        # THS数据源列名：'中国进口铁矿海运费:西澳港口-中国青岛港'（原 '运价:铁矿石:西澳-青岛(BCI-C5)'）
+        if 'BCI-C5' in col or '西澳-青岛' in col or '西澳' in col:
             bci_c5_col = col
             break
     if bci_c5_col is None:
@@ -391,12 +432,8 @@ def get_recent_spread(index_wind_df, product_name, days=10):
     if index_type not in ['MB65', 'MB_ALUMINA']:
         return None
 
-    # MB61列
-    mb61_col = None
-    for col in index_wind_df.columns:
-        if '61%Fe' in col and 'MB' in col and '铁矿石指数' in col:
-            mb61_col = col
-            break
+    # MB61列（THS数据源已移除61%Fe，以 MB价格指数:62%粉矿 替代）
+    mb61_col = find_index_col(index_wind_df, 'MB61')
 
     if mb61_col is None:
         print(f"  警告: 未找到MB61列")
@@ -405,15 +442,9 @@ def get_recent_spread(index_wind_df, product_name, days=10):
     # 目标指数列
     target_col = None
     if index_type == 'MB65':
-        for col in index_wind_df.columns:
-            if '65%' in col and '巴西' in col:
-                target_col = col
-                break
+        target_col = find_index_col(index_wind_df, 'MB65')
     elif index_type == 'MB_ALUMINA':
-        for col in index_wind_df.columns:
-            if '底铝' in col:
-                target_col = col
-                break
+        target_col = find_index_col(index_wind_df, 'MB_ALUMINA')
 
     if target_col is None:
         print(f"  警告: 未找到{product_name}对应的指数列")
@@ -486,11 +517,8 @@ def get_cn_north61(index_wind_df, target_date):
     if index_wind_df is None or index_wind_df.empty:
         return None
 
-    col_name = None
-    for col in index_wind_df.columns:
-        if '北方' in col and '61%Fe' in col:
-            col_name = col
-            break
+    # 中国北方61%Fe:CFR 在THS数据源中对应 '价格指数:铁矿石:62%Fe:CFR'
+    col_name = find_index_col(index_wind_df, 'CN61')
 
     if col_name is None:
         print(f"  警告: 未找到中国北方61%Fe指数列")
@@ -537,22 +565,22 @@ def get_index_price(index_wind_df, index_ms_df, product_name, target_date, last_
     use_daily = target_date.date() >= last_index_date.date()
 
     if index_type == 'MB61':
-        for col in index_wind_df.columns:
-            if '61%Fe' in col and 'MB' in col and '铁矿石指数' in col:
-                if use_daily:
-                    filtered = index_wind_df[
-                        (index_wind_df['指标名称'] <= target_date) &
-                        (pd.to_numeric(index_wind_df[col], errors='coerce') > 0)
-                    ]
-                    if not filtered.empty:
-                        return float(filtered.sort_values('指标名称').iloc[-1][col])
-                else:
-                    monthly_data = index_wind_df[
-                        (index_wind_df['月份'] == target_month) &
-                        (pd.to_numeric(index_wind_df[col], errors='coerce') > 0)
-                    ]
-                    if not monthly_data.empty:
-                        return monthly_data[col].astype(float).mean()
+        col = find_index_col(index_wind_df, 'MB61')
+        if col:
+            if use_daily:
+                filtered = index_wind_df[
+                    (index_wind_df['指标名称'] <= target_date) &
+                    (pd.to_numeric(index_wind_df[col], errors='coerce') > 0)
+                ]
+                if not filtered.empty:
+                    return float(filtered.sort_values('指标名称').iloc[-1][col])
+            else:
+                monthly_data = index_wind_df[
+                    (index_wind_df['月份'] == target_month) &
+                    (pd.to_numeric(index_wind_df[col], errors='coerce') > 0)
+                ]
+                if not monthly_data.empty:
+                    return monthly_data[col].astype(float).mean()
 
     elif index_type == 'ARGUS_MYSTEEL_AVG':
         argus_col = None
@@ -594,67 +622,62 @@ def get_index_price(index_wind_df, index_ms_df, product_name, target_date, last_
                     return (argus_vals.astype(float).mean() + mysteel_vals.astype(float).mean()) / 2
 
     elif index_type == 'MB65':
-        for col in index_wind_df.columns:
-            if '65%' in col and '巴西' in col:
-                if use_daily:
-                    filtered = index_wind_df[
-                        (index_wind_df['指标名称'] <= target_date) &
-                        (pd.to_numeric(index_wind_df[col], errors='coerce') > 0)
-                    ]
-                    if not filtered.empty:
-                        return float(filtered.sort_values('指标名称').iloc[-1][col])
-                else:
-                    monthly_data = index_wind_df[
-                        (index_wind_df['月份'] == target_month) &
-                        (pd.to_numeric(index_wind_df[col], errors='coerce') > 0)
-                    ]
-                    if not monthly_data.empty:
-                        return monthly_data[col].astype(float).mean()
+        col = find_index_col(index_wind_df, 'MB65')
+        if col:
+            if use_daily:
+                filtered = index_wind_df[
+                    (index_wind_df['指标名称'] <= target_date) &
+                    (pd.to_numeric(index_wind_df[col], errors='coerce') > 0)
+                ]
+                if not filtered.empty:
+                    return float(filtered.sort_values('指标名称').iloc[-1][col])
+            else:
+                monthly_data = index_wind_df[
+                    (index_wind_df['月份'] == target_month) &
+                    (pd.to_numeric(index_wind_df[col], errors='coerce') > 0)
+                ]
+                if not monthly_data.empty:
+                    return monthly_data[col].astype(float).mean()
 
     elif index_type == 'MB_ALUMINA':
-        for col in index_wind_df.columns:
-            if '底铝' in col:
-                if use_daily:
-                    filtered = index_wind_df[
-                        (index_wind_df['指标名称'] <= target_date) &
-                        (pd.to_numeric(index_wind_df[col], errors='coerce') > 0)
-                    ]
-                    if not filtered.empty:
-                        return float(filtered.sort_values('指标名称').iloc[-1][col])
-                else:
-                    monthly_data = index_wind_df[
-                        (index_wind_df['月份'] == target_month) &
-                        (pd.to_numeric(index_wind_df[col], errors='coerce') > 0)
-                    ]
-                    if not monthly_data.empty:
-                        return monthly_data[col].astype(float).mean()
+        col = find_index_col(index_wind_df, 'MB_ALUMINA')
+        if col:
+            if use_daily:
+                filtered = index_wind_df[
+                    (index_wind_df['指标名称'] <= target_date) &
+                    (pd.to_numeric(index_wind_df[col], errors='coerce') > 0)
+                ]
+                if not filtered.empty:
+                    return float(filtered.sort_values('指标名称').iloc[-1][col])
+            else:
+                monthly_data = index_wind_df[
+                    (index_wind_df['月份'] == target_month) &
+                    (pd.to_numeric(index_wind_df[col], errors='coerce') > 0)
+                ]
+                if not monthly_data.empty:
+                    return monthly_data[col].astype(float).mean()
 
     elif index_type == 'CN_NORTH_61':
-        for col in index_wind_df.columns:
-            if '中国北方' in col and '61%Fe' in col:
-                if use_daily:
-                    filtered = index_wind_df[
-                        (index_wind_df['指标名称'] <= target_date) &
-                        (pd.to_numeric(index_wind_df[col], errors='coerce') > 0)
-                    ]
-                    if not filtered.empty:
-                        return float(filtered.sort_values('指标名称').iloc[-1][col])
-                else:
-                    monthly_data = index_wind_df[
-                        (index_wind_df['月份'] == target_month) &
-                        (pd.to_numeric(index_wind_df[col], errors='coerce') > 0)
-                    ]
-                    if not monthly_data.empty:
-                        return monthly_data[col].astype(float).mean()
+        col = find_index_col(index_wind_df, 'CN61')
+        if col:
+            if use_daily:
+                filtered = index_wind_df[
+                    (index_wind_df['指标名称'] <= target_date) &
+                    (pd.to_numeric(index_wind_df[col], errors='coerce') > 0)
+                ]
+                if not filtered.empty:
+                    return float(filtered.sort_values('指标名称').iloc[-1][col])
+            else:
+                monthly_data = index_wind_df[
+                    (index_wind_df['月份'] == target_month) &
+                    (pd.to_numeric(index_wind_df[col], errors='coerce') > 0)
+                ]
+                if not monthly_data.empty:
+                    return monthly_data[col].astype(float).mean()
 
     elif index_type == 'CN_NORTH_MB61_AVG':
-        cn_north_col = None
-        mb61_col = None
-        for col in index_wind_df.columns:
-            if '中国北方' in col and '61%Fe' in col:
-                cn_north_col = col
-            elif '61%Fe' in col and 'MB' in col and '铁矿石指数' in col:
-                mb61_col = col
+        cn_north_col = find_index_col(index_wind_df, 'CN61')
+        mb61_col = find_index_col(index_wind_df, 'MB61')
 
         if cn_north_col and mb61_col:
             if use_daily:
