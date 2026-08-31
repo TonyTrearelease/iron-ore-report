@@ -72,6 +72,15 @@ def main():
         print("  [INFO] No changes to commit, skipping push")
         return
 
+    # 检查Token：若缺失，git push 会因无凭据而静默失败，导致"提交了但没推上去"
+    token = os.environ.get("GITHUB_TOKEN", "")
+    if not token:
+        print("  [FAILED] 未检测到 GITHUB_TOKEN 环境变量，无法推送")
+        print("  请先设置环境变量后重试，例如在PowerShell中执行：")
+        print("    setx GITHUB_TOKEN \"你的Fine-grained token\"")
+        print("  然后重新打开终端再运行本脚本；或直接运行 git push --force origin main 手动推送")
+        sys.exit(1)
+
     ensure_git_config()
     subprocess.run([GIT_EXE, "add", "-A"], check=True, cwd=SCRIPT_DIR)
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -81,8 +90,8 @@ def main():
     if result.returncode == 0:
         print("  [OK] Push successful!")
         print("  -> Access in 1-2 minutes:")
-        print("    https://tonytrearelease.github.io/iron-ore-report/import_cost_profit_report.html")
-        print("    https://tonytrearelease.github.io/iron-ore-report/import_cost_interactive_calculator.html")
+        print("    https://tonytrearelease.github.io/iron-ore-report/%E8%BF%9B%E5%8F%A3%E6%88%90%E6%9C%AC%E5%88%A9%E6%B6%A6%E5%8F%AF%E8%A7%86%E5%8C%96%E6%8A%A5%E8%A1%A8.html")
+        print("    https://tonytrearelease.github.io/iron-ore-report/%E8%BF%9B%E5%8F%A3%E6%88%90%E6%9C%AC%E4%BA%A4%E4%BA%92%E8%AE%A1%E7%AE%97%E5%99%A8.html")
     else:
         print("  [FAILED] Push failed, details:")
         print(result.stdout)
