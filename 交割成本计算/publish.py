@@ -28,7 +28,8 @@ print("=" * 50)
 print("\n[1/3] 读取最新价格...")
 df = pd.read_csv(CSV_PATH)
 latest = df.iloc[-1]
-date_str = str(latest.index[0]) if 'Unnamed' not in str(df.columns[0]) else str(latest.iloc[0])
+# 首列"指标名称"单元格存放日期，取最后一行首列的值作为最新数据日期
+date_str = str(latest[df.columns[0]])
 print(f"  最新数据日期: {date_str}")
 
 price_map = {
